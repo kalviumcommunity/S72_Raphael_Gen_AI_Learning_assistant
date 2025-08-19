@@ -183,12 +183,3 @@ Sometimes you need **clean, machine-readable answers** instead of plain text. Th
 * Chat memory with RAG for persistent sessions
 * Export structured data directly as CSV/Excel
 
----
-
-## 📜 License
-
-MIT License © 2025 Your Name
-
----
-
-Raf — do you also want me to **mock up one or two sample API responses** (like a structured JSON from a real page, e.g. a blog post or product listing) so devs know what kind of outputs to expect?

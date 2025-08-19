@@ -1,20 +1,21 @@
-Here’s a **README.md draft** tailored for your project idea (React frontend, Express backend, Google’s AI Studio for the API):
-
----
-
 # 📖 Webpage Q\&A Assistant
 
-An AI-powered fullstack web application that can read an entire webpage and answer user questions about its content. Built with **React** for the frontend, **Express.js** for the backend, and **Google’s AI Studio** for natural language processing.
+An AI-powered fullstack web application that can read entire webpages and answer user questions about their content. Built with **React** for the frontend, **Express.js** for the backend, and **Google’s AI Studio** for natural language processing.
+
+This app uses **RAG (Retrieval-Augmented Generation)** for handling large/multiple webpages, **function calling** for reliable task execution, and **structured outputs** for extracting clean, machine-readable data.
 
 ---
 
 ## 🚀 Features
 
-* Extracts and processes text from any webpage
-* AI-powered Q\&A based on the page content
+* Extracts and processes text from webpages
+* AI-powered Q\&A based on page content
 * Interactive chat interface for clarifying doubts
+* **RAG-powered knowledge retrieval** across long or multiple webpages
+* **Function calling** for reliable backend task execution
+* **Structured outputs** for extracting clean JSON data (tables, product info, metadata, etc.)
 * Fullstack setup with React + Express
-* Extensible architecture for future enhancements (embeddings, vector DB, etc.)
+* Extensible architecture for future enhancements
 
 ---
 
@@ -23,7 +24,8 @@ An AI-powered fullstack web application that can read an entire webpage and answ
 * **Frontend:** React + Vite (or CRA)
 * **Backend:** Express.js (Node.js)
 * **AI API:** Google AI Studio (Generative AI API)
-* **Optional:** Vector database (like Pinecone / Weaviate / FAISS) for large page handling
+* **Vector DB (for RAG):** Pinecone / Weaviate / Qdrant / pgvector
+* **Optional:** Chrome Extension integration
 
 ---
 
@@ -31,16 +33,17 @@ An AI-powered fullstack web application that can read an entire webpage and answ
 
 ```
 webpage-qa-assistant/
-│── backend/          # Express server
+│── backend/          
 │   ├── routes/       # API routes
-│   ├── services/     # AI API integration
-│   └── server.js     # Entry point
+│   ├── services/     # AI + RAG + function calling
+│   ├── utils/        # Embeddings, chunking, retrieval
+│   └── server.js     
 │
-│── frontend/         # React app
+│── frontend/         
 │   ├── src/
-│   │   ├── components/  # UI components
-│   │   ├── pages/       # Page views
-│   │   └── App.jsx      # Root component
+│   │   ├── components/  
+│   │   ├── pages/       
+│   │   └── App.jsx      
 │
 │── README.md
 │── package.json
@@ -80,6 +83,7 @@ Create a `.env` file in the **backend/** folder:
 ```env
 PORT=5000
 GOOGLE_API_KEY=your_google_ai_studio_api_key
+VECTOR_DB_URL=your_vector_db_url
 ```
 
 ---
@@ -128,18 +132,49 @@ Ask a question about the webpage content.
 
 ---
 
+## 📚 RAG Features
+
+1. **Ask Across Multiple Pages** → Query knowledge across multiple URLs or documents.
+2. **Contextual Summaries** → Generate section-wise summaries (FAQ, pricing, reviews, etc.).
+3. **Comparative Q\&A** → Compare content between different websites.
+4. **Persistent Knowledge Base** → Save and query previously visited webpages.
+
+---
+
+## ⚡ Function Calling Features
+
+1. **URL Fetching** → AI can call `fetchWebpage(url)` to pull webpage content.
+2. **Highlight & Answer** → Users click text, AI calls `highlightSection(text)` to explain.
+3. **Search Within Page** → AI calls `findInPage(query, content)` for precise answers.
+4. **Fact Verification** → AI calls `checkFact(statement)` before answering.
+
+---
+
+## 📊 Structured Output Features
+
+Sometimes you need **clean, machine-readable answers** instead of plain text. This app supports structured outputs such as JSON:
+
+* **Product Extraction** → Extract `{ name, price, rating }` from an e-commerce page
+* **Metadata Extraction** → Get `{ title, author, publishDate }` from articles/blogs
+* **Table Conversion** → Convert raw page tables into structured JSON arrays
+* **Key-Value Summaries** → Return FAQs or policy documents as structured fields
+
+**Example:**
+
+```json
+{
+  "products": [
+    { "name": "Wireless Mouse", "price": "$19.99", "rating": 4.5 },
+    { "name": "Mechanical Keyboard", "price": "$89.99", "rating": 4.7 }
+  ]
+}
+```
+
+---
+
 ## 📦 Future Improvements
 
-* Add vector embeddings for better context retrieval
-* Support multiple document formats (PDF, Word, etc.)
-* Chrome extension to chat directly on any webpage
-
----
-
-## 📜 License
-
-MIT License © 2025 Your Name
-
----
-
-Raf, do you want me to also **add some sample code snippets** (React frontend chat UI + Express backend route for Google AI API) to this README, so it doubles as a dev guide?
+* Chrome extension for real-time Q\&A on any page
+* Support for multiple document formats (PDF, Word, etc.)
+* Chat memory with RAG for persistent sessions
+* Export structured data directly as CSV/Excel

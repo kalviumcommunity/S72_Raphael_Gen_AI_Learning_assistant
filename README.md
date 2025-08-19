@@ -1,7 +1,3 @@
-Got it ✅ I’ll update the **README** to include a clear **structured outputs feature** section so it stands out as a core part of the app, not just hidden under function calling. Here’s the improved README:
-
----
-
 # 📖 Webpage Q\&A Assistant
 
 An AI-powered fullstack web application that can read entire webpages and answer user questions about their content. Built with **React** for the frontend, **Express.js** for the backend, and **Google’s AI Studio** for natural language processing.

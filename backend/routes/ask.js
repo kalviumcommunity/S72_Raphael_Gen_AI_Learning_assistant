@@ -32,7 +32,7 @@ router.post("/ask", async (req, res) => {
           const userQuestion = prompt.replace(/\nBased on this URL: https?:\/\/[^\s\n]+/, '');
           finalPrompt = `Read the following webpage content and answer the question clearly. 
           Use unordered (•) and ordered (1., 2., 3.) lists for readability, and sprinkle minimal, relevant emojis. 
-          Do not invent information beyond what is in the content. 
+          Do not invent false or fake information but certainly add relevant information and details if needed.
           Webpage Content: ${webContent}
           Question: ${userQuestion}`;
         } catch (error) {

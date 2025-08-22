@@ -27,7 +27,7 @@ export default function App() {
         prompt += `\nBased on this content: ${content.trim()}`;
       }
 
-      const res = await fetch("https://s72-raphael-gen-ai-learning-git-94ff67-raphs-projects-17635e45.vercel.app/api/ask", {
+      const res = await fetch("https://s72-raphael-gen-ai-learning-assistant.onrender.com//api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),

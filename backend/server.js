@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 5000;
 
 // ✅ Custom CORS settings
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://readingassist.netlify.app/"],
+  origin: ["http://localhost:5173", "https://readingassist.netlify.app"],
   methods: ["GET", "POST", "OPTIONS"], // allowed methods
   allowedHeaders: ["Content-Type", "Authorization"], // allowed headers
   credentials: true // if you need cookies/auth headers

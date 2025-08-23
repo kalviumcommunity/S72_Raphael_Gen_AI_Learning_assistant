@@ -26,7 +26,8 @@ export default function App() {
       if (mode === "text" && content.trim()) {
         prompt += `\nBased on this content: ${content.trim()}`;
       }
-
+      
+      // http://localhost:5000/api/ask
       const res = await fetch("https://s72-raphael-gen-ai-learning-assistant.onrender.com/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

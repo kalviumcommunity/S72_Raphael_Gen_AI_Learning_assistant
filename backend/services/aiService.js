@@ -13,8 +13,13 @@ export async function askGemini(prompt) {
   try {
     const result = await model.generateContent(prompt);
 
-    // Get the plain text output
+    // Extract response text
     const text = result.response.text();
+
+    // Check for usage metadata
+    if (result.response.usageMetadata) {
+      console.log("Token usage:", result.response.usageMetadata);
+    }
 
     return text || "Sorry, I couldn’t generate a response.";
   } catch (error) {

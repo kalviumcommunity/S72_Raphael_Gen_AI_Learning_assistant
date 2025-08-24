@@ -11,7 +11,6 @@ const model = genAI.getGenerativeModel({
   model: "gemini-2.0-flash",
   generationConfig: {
     temperature: 0.7, // controls creativity (0 = focused, 1+ = more random)
-    topP: 0.9,        // nucleus sampling
     topK: 40,         // limits token sampling choices
     maxOutputTokens: 512, // cap output length
   },

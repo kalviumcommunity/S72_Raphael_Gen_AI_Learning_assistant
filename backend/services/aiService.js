@@ -7,6 +7,15 @@ dotenv.config();
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 // Choose model (update name if you want gemini-2.0-flash-exp or gemini-1.5-pro etc.)
+const model = genAI.getGenerativeModel({
+  model: "gemini-2.0-flash",
+  generationConfig: {
+    temperature: 0.7, // controls creativity (0 = focused, 1+ = more random)
+    topP: 0.9,        // nucleus sampling
+    topK: 40,         // limits token sampling choices
+    maxOutputTokens: 512, // cap output length
+  },
+});
 
 export async function askGemini(prompt) {
   try {

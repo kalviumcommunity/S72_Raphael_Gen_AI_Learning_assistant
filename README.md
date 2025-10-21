@@ -6,6 +6,12 @@ This app uses **RAG (Retrieval-Augmented Generation)** for handling large/multip
 
 ---
 
+# Deployment Link
+
+https://readingassist.netlify.app/
+
+---
+
 ## 🚀 Features
 
 * Extracts and processes text from webpages
@@ -26,85 +32,6 @@ This app uses **RAG (Retrieval-Augmented Generation)** for handling large/multip
 * **AI API:** Google AI Studio (Generative AI API)
 * **Vector DB (for RAG):** Pinecone / Weaviate / Qdrant / pgvector
 * **Optional:** Chrome Extension integration
-
----
-
-## 📂 Project Structure
-
-```
-webpage-qa-assistant/
-│── backend/          
-│   ├── routes/       # API routes
-│   ├── services/     # AI + RAG + function calling
-│   ├── utils/        # Embeddings, chunking, retrieval
-│   └── server.js     
-│
-│── frontend/         
-│   ├── src/
-│   │   ├── components/  
-│   │   ├── pages/       
-│   │   └── App.jsx      
-│
-│── README.md
-│── package.json
-```
-
----
-
-## ⚙️ Setup & Installation
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/yourusername/webpage-qa-assistant.git
-cd webpage-qa-assistant
-```
-
-### 2. Install Dependencies
-
-* **Backend**
-
-```bash
-cd backend
-npm install
-```
-
-* **Frontend**
-
-```bash
-cd frontend
-npm install
-```
-
-### 3. Environment Variables
-
-Create a `.env` file in the **backend/** folder:
-
-```env
-PORT=5000
-GOOGLE_API_KEY=your_google_ai_studio_api_key
-VECTOR_DB_URL=your_vector_db_url
-```
-
----
-
-## ▶️ Running the App
-
-* **Backend**
-
-```bash
-cd backend
-npm run dev
-```
-
-* **Frontend**
-
-```bash
-cd frontend
-npm run dev
-```
-
-The frontend should now be running on [http://localhost:5173](http://localhost:5173) and backend on [http://localhost:5000](http://localhost:5000).
 
 ---
 

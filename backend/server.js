@@ -1,11 +1,19 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import mongoose from "mongoose"; // ✅ Added for MongoDB
 import askRoute from "./routes/ask.js";
+import authRoutes from "./routes/auth.js"; // ✅ Added for auth routes
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// ✅ Connect to MongoDB
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ Connected to MongoDB"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // ✅ Custom CORS settings
 const corsOptions = {
@@ -20,6 +28,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api", askRoute);
+app.use("/api/auth", authRoutes); // ✅ Added for auth endpoints
 
 app.get("/", (req, res) => {
   res.send("✅ Backend is running!");

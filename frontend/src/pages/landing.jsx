@@ -1,173 +1,228 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Landing() {
-  const [mode, setMode] = useState("url"); // url | text
+  const [mode, setMode] = useState("url");
   const [url, setUrl] = useState("");
   const [content, setContent] = useState("");
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const chatEndRef = useRef(null);
+  const sidebarRef = useRef(null);
   const navigate = useNavigate();
 
-  // ✅ Load saved input values from localStorage on mount
+  const [chats, setChats] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
+  const [editingChatId, setEditingChatId] = useState(null);
+  const [editedName, setEditedName] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // ✅ Scroll to bottom when messages update
   useEffect(() => {
-    const savedUrl = localStorage.getItem("landing_url");
-    const savedContent = localStorage.getItem("landing_content");
-    const savedQuestion = localStorage.getItem("landing_question");
-    if (savedUrl) setUrl(savedUrl);
-    if (savedContent) setContent(savedContent);
-    if (savedQuestion) setQuestion(savedQuestion);
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ✅ INITIAL LOAD: Load all data from localStorage once on mount
+  useEffect(() => {
+    const savedChats = JSON.parse(localStorage.getItem("chats") || "[]");
+    const savedCurrentId = localStorage.getItem("currentChatId");
+    const savedUrl = localStorage.getItem("landing_url") || "";
+    const savedContent = localStorage.getItem("landing_content") || "";
+
+    // Set all state
+    setChats(savedChats);
+    setUrl(savedUrl);
+    setContent(savedContent);
+
+    // Restore current chat if it exists
+    if (savedCurrentId && savedChats.length > 0) {
+      const activeChat = savedChats.find((c) => c.id === savedCurrentId);
+      if (activeChat) {
+        setCurrentChatId(savedCurrentId);
+        setMessages(activeChat.messages || []);
+        
+        // Scroll to active chat in sidebar
+        setTimeout(() => {
+          const activeEl = document.getElementById(`chat-${savedCurrentId}`);
+          activeEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 200);
+      }
+    }
+
+    setIsInitialized(true);
   }, []);
 
-  // ✅ Save input values to localStorage whenever they change
+  // ✅ Save chats array to localStorage whenever it changes (after initialization)
   useEffect(() => {
+    if (!isInitialized) return;
+    localStorage.setItem("chats", JSON.stringify(chats));
+  }, [chats, isInitialized]);
+
+  // ✅ Save current chat ID whenever it changes
+  useEffect(() => {
+    if (!isInitialized) return;
+    if (currentChatId) {
+      localStorage.setItem("currentChatId", currentChatId);
+    } else {
+      localStorage.removeItem("currentChatId");
+    }
+  }, [currentChatId, isInitialized]);
+
+  // ✅ Save URL and content whenever they change
+  useEffect(() => {
+    if (!isInitialized) return;
     localStorage.setItem("landing_url", url);
-  }, [url]);
+  }, [url, isInitialized]);
 
   useEffect(() => {
+    if (!isInitialized) return;
     localStorage.setItem("landing_content", content);
-  }, [content]);
+  }, [content, isInitialized]);
 
+  // ✅ Sync messages into current chat whenever messages change
   useEffect(() => {
-    localStorage.setItem("landing_question", question);
-  }, [question]);
+    if (!isInitialized || !currentChatId) return;
 
-  // ✅ Check login status on mount
+    setChats((prevChats) => {
+      const chatExists = prevChats.find((c) => c.id === currentChatId);
+      if (!chatExists) return prevChats;
+
+      return prevChats.map((chat) =>
+        chat.id === currentChatId ? { ...chat, messages } : chat
+      );
+    });
+  }, [messages, currentChatId, isInitialized]);
+
+  // ✅ Check login status
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
       setIsLoggedIn(true);
       setShowWelcome(true);
-      // Auto-hide the popup after 3 seconds
       const timer = setTimeout(() => setShowWelcome(false), 3000);
       return () => clearTimeout(timer);
     }
   }, []);
 
-  const handleAsk = async () => {
-    if (!question.trim()) {
-      setAnswer("⚠️ Please enter a question.");
-      return;
-    }
+  // ✅ Create new chat
+  const handleNewChat = () => {
+    const newChat = {
+      id: Date.now().toString(),
+      name: `Chat ${chats.length + 1}`,
+      messages: [],
+    };
+    setChats([...chats, newChat]);
+    setCurrentChatId(newChat.id);
+    setMessages([]);
+  };
 
+  // ✅ Switch to a different chat
+  const handleSelectChat = (id) => {
+    const chat = chats.find((c) => c.id === id);
+    if (chat) {
+      setCurrentChatId(id);
+      setMessages(chat.messages || []);
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 150);
+    }
+  };
+
+  // ✅ Delete a chat
+  const handleDeleteChat = (id) => {
+    const updated = chats.filter((c) => c.id !== id);
+    setChats(updated);
+
+    // If we deleted the current chat, switch to another one
+    if (id === currentChatId) {
+      const nextChat = updated[0] || null;
+      setCurrentChatId(nextChat?.id || null);
+      setMessages(nextChat?.messages || []);
+    }
+  };
+
+  // ✅ Start editing chat name
+  const handleEditChatName = (chat) => {
+    setEditingChatId(chat.id);
+    setEditedName(chat.name);
+  };
+
+  // ✅ Save edited chat name
+  const handleSaveChatName = (chatId) => {
+    const updated = chats.map((c) =>
+      c.id === chatId ? { ...c, name: editedName.trim() || c.name } : c
+    );
+    setChats(updated);
+    setEditingChatId(null);
+  };
+
+  // ✅ Handle quiz button click
+  const handleQuizClick = () => {
+    if (isLoggedIn) {
+      // 🆕 Added: Pass the real article data to Quiz page
+      navigate("/quiz", { state: { url, content } });
+    } else {
+      navigate("/login");
+    }
+  };
+
+  // ✅ Send message to backend
+  const handleSend = async () => {
+    if (!input.trim()) return;
+
+    const newMessage = { role: "user", content: input.trim() };
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
+    setInput("");
     setLoading(true);
-    setAnswer("");
 
     try {
-      let prompt = question.trim();
-      if (mode === "url" && url.trim()) prompt += `\nBased on this URL: ${url.trim()}`;
-      if (mode === "text" && content.trim()) prompt += `\nBased on this content: ${content.trim()}`;
+      let systemContext = "";
+      if (mode === "url" && url.trim()) {
+        systemContext = `Based on this URL: ${url.trim()}`;
+      }
+      if (mode === "text" && content.trim()) {
+        systemContext = `Based on this content: ${content.trim()}`;
+      }
 
-      const res = await fetch("http://localhost:5000/api/ask", {
+      const payload = {
+        question: input.trim(),
+        context: systemContext,
+      };
+
+      const res = await fetch("https://s72-raphael-gen-ai-learning-assistant.onrender.com//api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error(await res.text() || "Server error");
-
+      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setAnswer(data.answer || "🤔 No answer returned.");
+
+      const finalMessages = [
+        ...updatedMessages,
+        { role: "assistant", content: data.answer || "No response" },
+      ];
+      setMessages(finalMessages);
     } catch (err) {
       console.error("Frontend error:", err);
-      setAnswer("❌ Something went wrong while contacting the AI.");
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "❌ Something went wrong." },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Format AI response text
-  const formatAnswer = (text) => {
-    if (!text) return null;
-
-    const lines = text.split("\n");
-    const formattedContent = [];
-    const emojiMap = {
-      Key: "🔑",
-      Important: "⚠️",
-      Tip: "💡",
-      Note: "📝",
-      Example: "📌",
-      Conclusion: "✅",
-      Question: "❓",
-    };
-
-    const addEmojis = (line) => {
-      for (const key in emojiMap) {
-        if (line.includes(key)) line = line.replace(key, `${emojiMap[key]} ${key}`);
-      }
-      return line;
-    };
-
-    lines.forEach((line, index) => {
-      if (!line.trim()) {
-        formattedContent.push(<br key={`br-${index}`} />);
-        return;
-      }
-
-      let formattedLineText = line.replace(/^\*\s+/, "• ");
-      formattedLineText = addEmojis(formattedLineText);
-
-      if (formattedLineText.includes("**") && !formattedLineText.includes("***")) {
-        const parts = formattedLineText.split(/(\*\*[^*]+\*\*)/g);
-        const formattedLine = parts.map((part, partIndex) => {
-          if (part.startsWith("**") && part.endsWith("**")) {
-            return (
-              <strong key={`bold-${index}-${partIndex}`} className="text-indigo-300 text-xl">
-                {part.slice(2, -2)}
-              </strong>
-            );
-          }
-          return part;
-        });
-        formattedContent.push(
-          <div key={`heading-${index}`} className="mt-4 mb-2">
-            {formattedLine}
-          </div>
-        );
-      } else if (formattedLineText.includes("***")) {
-        const cleanLine = formattedLineText.replace(/\*\*\*/g, "").trim();
-        const [title, ...description] = cleanLine.split(":");
-        formattedContent.push(
-          <div key={`subitem-${index}`} className="ml-4 mb-2 text-lg">
-            <span className="text-yellow-300 font-semibold">• {title}:</span>
-            {description.length > 0 && (
-              <span className="text-gray-200 ml-2">{description.join(":")}</span>
-            )}
-          </div>
-        );
-      } else if (/^\d+\./.test(formattedLineText.trim())) {
-        formattedContent.push(
-          <div key={`numbered-${index}`} className="ml-4 mb-1 text-gray-200 text-lg">
-            {formattedLineText.trim()}
-          </div>
-        );
-      } else if (formattedLineText.startsWith("• ")) {
-        formattedContent.push(
-          <div key={`bullet-${index}`} className="ml-4 mb-1 text-gray-200 text-lg">
-            {formattedLineText}
-          </div>
-        );
-      } else {
-        formattedContent.push(
-          <div key={`para-${index}`} className="mb-2 text-gray-200 text-lg">
-            {formattedLineText}
-          </div>
-        );
-      }
-    });
-
-    return formattedContent;
-  };
-
   return (
-    <div className={`h-screen bg-gray-900 text-gray-100 flex flex-col overflow-hidden relative`}>
+    <div className="h-screen bg-gray-900 text-gray-100 flex flex-col overflow-hidden relative">
       {/* Header */}
       <div className="flex-shrink-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-indigo-400">🧠 Gen AI Reading Assistant</h1>
+        <h1 className="text-2xl font-bold text-indigo-400">🧠 Gen AI Chat Assistant</h1>
         {!isLoggedIn && (
           <button
             className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transform hover:scale-105 transition-all duration-200"
@@ -180,15 +235,84 @@ export default function Landing() {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="w-96 bg-gray-800 border-r border-gray-700 flex flex-col">
-          <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-            {/* Mode Toggle */}
+        {/* Sidebar */}
+        <div ref={sidebarRef} className="w-96 bg-gray-800 border-r border-gray-700 flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Chats</h2>
+            <button
+              onClick={handleNewChat}
+              className="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 transition-colors"
+            >
+              + New
+            </button>
+          </div>
+
+          {/* Chat List */}
+          <div className="flex-1 overflow-y-auto">
+            {chats.length === 0 ? (
+              <p className="p-4 text-gray-400 text-sm">No chats yet. Create one!</p>
+            ) : (
+              chats.map((chat) => (
+                <div
+                  key={chat.id}
+                  id={`chat-${chat.id}`}
+                  className={`flex justify-between items-center px-4 py-3 cursor-pointer transition-colors ${
+                    chat.id === currentChatId
+                      ? "bg-indigo-700 text-white"
+                      : "hover:bg-gray-700"
+                  }`}
+                  onClick={() => handleSelectChat(chat.id)}
+                >
+                  {editingChatId === chat.id ? (
+                    <input
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      onBlur={() => handleSaveChatName(chat.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveChatName(chat.id);
+                        if (e.key === "Escape") setEditingChatId(null);
+                      }}
+                      autoFocus
+                      className="bg-gray-900 text-white border border-gray-600 rounded px-2 py-1 w-full text-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span
+                      className="truncate flex-1"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        handleEditChatName(chat);
+                      }}
+                      title="Double-click to rename"
+                    >
+                      {chat.name}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteChat(chat.id);
+                    }}
+                    className="text-gray-400 hover:text-red-400 text-sm ml-2 px-2"
+                    title="Delete Chat"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Mode Selection and Input */}
+          <div className="p-6 border-t border-gray-700 space-y-4">
             <div className="flex gap-2">
               <button
                 onClick={() => setMode("url")}
                 className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-colors ${
-                  mode === "url" ? "bg-indigo-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  mode === "url"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
               >
                 URL
@@ -196,105 +320,109 @@ export default function Landing() {
               <button
                 onClick={() => setMode("text")}
                 className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-colors ${
-                  mode === "text" ? "bg-indigo-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  mode === "text"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
               >
                 Text
               </button>
             </div>
 
-            {/* Inputs */}
             {mode === "url" ? (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Webpage URL</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Webpage URL
+                </label>
                 <input
                   type="text"
                   placeholder="https://example.com/article"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  className="w-full border border-gray-600 bg-gray-900 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
+                  className="w-full border border-gray-600 bg-gray-900 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none"
                 />
               </div>
             ) : (
-              <div className="flex-1 flex flex-col">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Webpage Content</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Webpage Content
+                </label>
                 <textarea
                   placeholder="Paste full webpage content here..."
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="flex-1 w-full border border-gray-600 bg-gray-900 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all resize-none"
-                  style={{ minHeight: "200px" }}
+                  className="w-full border border-gray-600 bg-gray-900 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none resize-none"
+                  style={{ minHeight: "120px" }}
                 />
               </div>
             )}
-
-            {/* Question Input */}
-            <div className="flex-1 flex flex-col">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Your Question</label>
-              <textarea
-                placeholder="Ask me something..."
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="flex-1 w-full border border-gray-600 bg-gray-900 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all resize-none"
-                style={{ minHeight: "120px" }}
-              />
-            </div>
-          </div>
-
-          <div className="p-6 border-t border-gray-700">
-            <button
-              onClick={handleAsk}
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-            >
-              {loading ? "Thinking..." : "Ask AI"}
-            </button>
           </div>
         </div>
 
-        {/* Right Side */}
+        {/* Chat Area */}
         <div className="flex-1 flex flex-col bg-gray-900">
-          {loading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center animate-pulse">
-                <div className="text-6xl mb-4">⏳</div>
-                <h3 className="text-xl font-semibold text-indigo-300">Thinking...</h3>
-                <p className="text-gray-400">The AI is generating your answer</p>
-              </div>
-            </div>
-          ) : answer ? (
-            <div className="flex-1 overflow-y-auto flex flex-col justify-between">
-              <div className="p-8 max-w-none flex-1">
-                <div className="mb-6 pb-4 border-b border-gray-700">
-                  <h2 className="text-2xl font-bold text-indigo-300">Answer</h2>
-                </div>
-                <div className="text-gray-200 leading-relaxed text-lg">{formatAnswer(answer)}</div>
-              </div>
-
-              {/* ✅ Take Quiz Button */}
-              <div className="p-6 border-t border-gray-800 flex justify-center">
-                <button
-                  onClick={() => {
-                    if (isLoggedIn) navigate("/quiz");
-                    else navigate("/login");
-                  }}
-                  className="px-8 py-3 bg-indigo-600 text-white text-lg font-semibold rounded-lg hover:bg-indigo-700 transition-all transform hover:scale-105"
-                >
-                  🧩 Take a Quiz
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-gray-500">
+          {/* Messages Display */}
+          <div className="flex-1 overflow-y-auto p-8 space-y-6">
+            {messages.length === 0 ? (
+              <div className="text-center text-gray-500 mt-20">
                 <div className="text-6xl mb-4">🤖</div>
-                <h3 className="text-xl font-semibold mb-2">Ready to Help!</h3>
+                <h3 className="text-xl font-semibold mb-2">Start a Conversation</h3>
                 <p className="text-gray-400">
-                  Enter a URL or paste content, ask your question, and I'll provide detailed answers.
+                  Ask anything and continue chatting naturally!
                 </p>
               </div>
-            </div>
-          )}
+            ) : (
+              messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <div
+                    className={`max-w-xl px-4 py-3 rounded-2xl text-lg ${
+                      msg.role === "user"
+                        ? "bg-indigo-600 text-white rounded-br-none"
+                        : "bg-gray-800 text-gray-200 rounded-bl-none"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Message Input Area */}
+          <div className="p-6 border-t border-gray-800 flex gap-3">
+            <textarea
+              placeholder="Type your message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              className="flex-1 border border-gray-600 bg-gray-900 rounded-lg p-3 text-lg resize-none focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+              rows={2}
+            />
+            <button
+              onClick={handleQuizClick}
+              className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Take a Quiz
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={loading || !input.trim()}
+              className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? "..." : "Send"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

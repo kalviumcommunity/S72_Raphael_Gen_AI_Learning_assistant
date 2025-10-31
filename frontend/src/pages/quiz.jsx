@@ -1,83 +1,90 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // ✅ added useLocation
 
 export default function Quiz() {
+  const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
   const [score, setScore] = useState(null);
   const [quizExited, setQuizExited] = useState(false);
   const [showExitPopup, setShowExitPopup] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ added to access passed URL
+  const quizUrl = location.state?.url || ""; // ✅ safely extract URL from state
 
-  const questions = [
-    {
-      question: "Which of the following is a JavaScript framework?",
-      options: ["Django", "Flask", "React", "Laravel"],
-      correct: "React",
-    },
-    {
-      question: "Which HTML tag is used to link an external JavaScript file?",
-      options: ["<link>", "<js>", "<script>", "<src>"],
-      correct: "<script>",
-    },
-    {
-      question: "What is the correct syntax to declare a constant in JS?",
-      options: ["let x = 10;", "var x = 10;", "const x = 10;", "constant x = 10;"],
-      correct: "const x = 10;",
-    },
-    {
-      question: "In MongoDB, which command is used to insert a document?",
-      options: [
-        "db.collection.insert()",
-        "db.collection.add()",
-        "db.insertOne()",
-        "db.addDocument()",
-      ],
-      correct: "db.collection.insert()",
-    },
-    {
-      question: "Which method is used to fetch data in React?",
-      options: ["fetchData()", "getData()", "useFetch()", "fetch()"],
-      correct: "fetch()",
-    },
-  ];
+  // 🧠 Fetch randomized quiz questions from backend
+  useEffect(() => {
+    const fetchQuiz = async () => {
+      try {
+        setLoading(true);
 
-useEffect(() => {
-  const enterFullscreen = async () => {
-    const elem = document.documentElement;
-    try {
-      if (elem.requestFullscreen) await elem.requestFullscreen();
-      else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
-      else if (elem.msRequestFullscreen) await elem.msRequestFullscreen();
-    } catch (err) {
-      console.error("Fullscreen failed:", err);
-    }
-  };
-  enterFullscreen();
+        // ✅ Use the URL from landing page
+        const response = await fetch(" https://s72-raphael-gen-ai-learning-assistant.onrender.com/api/quiz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: quizUrl, // ✅ dynamically passed from landing
+            numQuestions: 5,
+          }),
+        });
 
-  const handleFullscreenChange = () => {
-    // ✅ Only trigger during quiz, not after finishing
-    if (!document.fullscreenElement && !document.webkitFullscreenElement && score === null) {
-      setQuizExited(true);
-      setScore(0);
-      setShowExitPopup(true);
+        if (!response.ok) {
+          throw new Error("Failed to fetch quiz questions");
+        }
 
-      setTimeout(() => {
-        setShowExitPopup(false);
-        navigate("/");
-      }, 3000);
-    }
-  };
+        const data = await response.json();
+        setQuestions(data.quiz);
+        setLoading(false);
+      } catch (err) {
+        console.error("Quiz fetch error:", err);
+        setFetchError(err.message);
+        setLoading(false);
+      }
+    };
 
-  document.addEventListener("fullscreenchange", handleFullscreenChange);
-  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    fetchQuiz();
+  }, [quizUrl]); // ✅ re-run if URL changes
 
-  return () => {
-    document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-  };
-}, [navigate, score]);
+  // 🧩 Fullscreen + exit handling
+  useEffect(() => {
+    const enterFullscreen = async () => {
+      const elem = document.documentElement;
+      try {
+        if (elem.requestFullscreen) await elem.requestFullscreen();
+        else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
+        else if (elem.msRequestFullscreen) await elem.msRequestFullscreen();
+      } catch (err) {
+        console.error("Fullscreen failed:", err);
+      }
+    };
 
+    enterFullscreen();
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && !document.webkitFullscreenElement && score === null) {
+        setQuizExited(true);
+        setScore(0);
+        setShowExitPopup(true);
+
+        setTimeout(() => {
+          setShowExitPopup(false);
+          navigate("/");
+        }, 3000);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, [navigate, score]);
+
+  // 🧩 Handle quiz logic
   const handleAnswer = (option) => {
     setAnswers((prev) => ({ ...prev, [currentQuestion]: option }));
   };
@@ -93,7 +100,7 @@ useEffect(() => {
   const calculateScore = () => {
     let total = 0;
     questions.forEach((q, i) => {
-      if (answers[i] === q.correct) total++;
+      if (answers[i] === q.answer) total++;
     });
     setScore(total);
     document.exitFullscreen?.();
@@ -104,6 +111,30 @@ useEffect(() => {
     setScore(null);
     setCurrentQuestion(0);
   };
+
+  // 🧩 Handle edge states
+  if (loading) {
+    return (
+      <div className="h-screen bg-gray-900 text-gray-300 flex items-center justify-center">
+        <h2 className="text-2xl font-semibold animate-pulse">Loading quiz...</h2>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="h-screen bg-gray-900 text-gray-200 flex flex-col items-center justify-center">
+        <h2 className="text-2xl text-red-400 font-bold mb-4">Failed to load quiz 😢</h2>
+        <p className="mb-6 text-gray-400">{fetchError}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (quizExited) {
     return (
@@ -122,7 +153,7 @@ useEffect(() => {
     );
   }
 
-  // (Everything else stays identical below)
+  // 🏁 Show result screen
   if (score !== null) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-200 flex flex-col items-center py-12 px-6">
@@ -136,7 +167,7 @@ useEffect(() => {
         <div className="w-full max-w-4xl space-y-8">
           {questions.map((q, index) => {
             const userAnswer = answers[index];
-            const isCorrect = userAnswer === q.correct;
+            const isCorrect = userAnswer === q.answer;
             return (
               <div
                 key={index}
@@ -148,7 +179,7 @@ useEffect(() => {
                 <div className="grid gap-3">
                   {q.options.map((option, i) => {
                     const isUserAnswer = userAnswer === option;
-                    const isRightAnswer = q.correct === option;
+                    const isRightAnswer = q.answer === option;
                     return (
                       <div
                         key={i}
@@ -191,6 +222,7 @@ useEffect(() => {
 
   const currentQ = questions[currentQuestion];
 
+  // 🧩 Active question screen
   return (
     <div className="h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
       <div className="max-w-3xl w-full bg-gray-800 rounded-2xl p-10 shadow-2xl border border-indigo-400">

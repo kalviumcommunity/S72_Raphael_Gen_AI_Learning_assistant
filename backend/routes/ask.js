@@ -5,12 +5,76 @@ import { JSDOM } from "jsdom";
 
 const router = express.Router();
 
+// 🧠 In-memory chat store (structure: { sessionId: [{ role, message }] })
+const chatSessions = {};
+
+// 🆕 Helper: Save message in chat session
+function saveToChat(sessionId, role, message) {
+  if (!chatSessions[sessionId]) chatSessions[sessionId] = [];
+  chatSessions[sessionId].push({ role, message });
+
+  // Optional: limit history size to prevent overload
+  if (chatSessions[sessionId].length > 25) {
+    chatSessions[sessionId] = chatSessions[sessionId].slice(-25);
+  }
+}
+
+// 🆕 Route to start or resume a chat session
+router.post("/start", (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) {
+    // Generate a new session ID
+    const newSessionId = "session_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
+    chatSessions[newSessionId] = [];
+    return res.json({ sessionId: newSessionId, message: "New chat session started." });
+  } else {
+    if (!chatSessions[sessionId]) chatSessions[sessionId] = [];
+    return res.json({ sessionId, message: "Chat session resumed." });
+  }
+});
+
+// 🆕 Route to get chat history
+router.get("/history/:sessionId", (req, res) => {
+  const { sessionId } = req.params;
+  if (!chatSessions[sessionId]) return res.status(404).json({ error: "Session not found" });
+  res.json({ sessionId, history: chatSessions[sessionId] });
+});
+
+// 🆕 Route to clear a chat session
+router.delete("/clear/:sessionId", (req, res) => {
+  const { sessionId } = req.params;
+  delete chatSessions[sessionId];
+  res.json({ message: `Session ${sessionId} cleared.` });
+});
+
+// 💬 Existing /ask logic — now extended with chat session context
 router.post("/ask", async (req, res) => {
-  const { question, url, content, prompt } = req.body;
+  const { question, url, content, prompt, sessionId } = req.body;
+
+// 🧩 Handle frontend payload (messages array)
+let userMessage = "";
+if (req.body.messages && Array.isArray(req.body.messages)) {
+  const msgs = req.body.messages;
+  const lastUserMsg = msgs.reverse().find(m => m.role === "user");
+  if (lastUserMsg) userMessage = lastUserMsg.content;
+
+  // If there's system content (URL or text), handle that
+  const systemMsg = msgs.find(m => m.role === "system");
+  if (systemMsg) {
+    if (systemMsg.content.startsWith("Based on this URL:")) {
+      req.body.url = systemMsg.content.replace("Based on this URL:", "").trim();
+    } else if (systemMsg.content.startsWith("Based on this content:")) {
+      req.body.content = systemMsg.content.replace("Based on this content:", "").trim();
+    }
+  }
+
+  req.body.question = userMessage;
+}
 
   if (!question && !prompt) {
     return res.status(400).json({ error: "Question or prompt is required" });
   }
+
   try {
     let finalPrompt;
     let webContent = "";
@@ -80,9 +144,103 @@ router.post("/ask", async (req, res) => {
       finalPrompt = contextPrompt;
     }
 
-    const answer = await askGemini(finalPrompt);
-    res.json({ answer });
+    // 🧩 Add conversation history context (if session exists)
+    let historyContext = "";
+    if (sessionId && chatSessions[sessionId]) {
+      const history = chatSessions[sessionId]
+        .map(msg => `${msg.role === "user" ? "User" : "AI"}: ${msg.message}`)
+        .join("\n");
+      historyContext = `This is an ongoing chat. Previous messages:\n${history}\nNow, continue the conversation below:\n`;
+    }
+
+    const combinedPrompt = historyContext + finalPrompt;
+
+    // 💬 Ask AI
+    const answer = await askGemini(combinedPrompt);
+
+    // 🧠 Save to session memory
+    if (sessionId) {
+      saveToChat(sessionId, "user", question || prompt || "");
+      saveToChat(sessionId, "ai", answer);
+    }
+
+    res.json({ answer, sessionId });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🧠 Generate Randomized Quiz Questions
+router.post("/quiz", async (req, res) => {
+  const { url, content, numQuestions = 5 } = req.body;
+
+  if (!url && !content) {
+    return res.status(400).json({ error: "Either URL or content is required to generate a quiz." });
+  }
+
+  try {
+    // 1️⃣ Fetch or use provided content
+    let webContent = content || "";
+    if (url) {
+      try {
+        webContent = await fetchWebContent(url);
+      } catch (error) {
+        console.error("Failed to fetch web content:", error);
+        return res.status(500).json({ error: "Failed to fetch content from the provided URL." });
+      }
+    }
+
+    // 2️⃣ Build AI prompt with randomness
+    const randomSeed = Math.random().toString(36).substring(2, 8);
+    const quizPrompt = `
+You are a quiz master. Based on the following article, create ${numQuestions} multiple-choice questions.
+Each question should have exactly 4 options (A, B, C, D) and one correct answer.
+Vary the difficulty and topics randomly each time, and do not repeat identical questions between runs.
+Format the output strictly as JSON like this:
+
+[
+  {
+    "question": "What is ...?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "answer": "Option B"
+  },
+  ...
+]
+
+Random seed: ${randomSeed}
+Article Content:
+${webContent.substring(0, 8000)}  // keep token limit safe
+`;
+
+    // 3️⃣ Ask the AI
+    const aiResponse = await askGemini(quizPrompt);
+
+    // 4️⃣ Parse response safely
+    let quizData;
+    try {
+      quizData = JSON.parse(aiResponse);
+    } catch {
+      // Attempt to extract JSON if AI includes extra text
+      const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+      quizData = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+    }
+
+    // 5️⃣ Validate structure
+    if (!Array.isArray(quizData) || quizData.length === 0) {
+      return res.status(500).json({
+        error: "Failed to generate valid quiz questions.",
+        rawResponse: aiResponse,
+      });
+    }
+
+    res.json({
+      quiz: quizData,
+      totalQuestions: quizData.length,
+      note: "Questions are randomized each time."
+    });
+
+  } catch (err) {
+    console.error("Quiz generation error:", err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -20,7 +20,7 @@ export default function Quiz() {
       try {
         setLoading(true);
 
-        // ✅ Use the URL from landing page
+        //http://localhost:5000/api/quiz
         const response = await fetch(" https://s72-raphael-gen-ai-learning-assistant.onrender.com/api/quiz", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
